@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.plcoding.runique"
+    namespace = "com.jnasser.runique"
 
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -42,6 +42,8 @@ dependencies {
 
     // Crypto
     implementation(libs.androidx.security.crypto.ktx)
+
+    implementation(libs.bundles.koin)
 
     api(libs.core)
 
