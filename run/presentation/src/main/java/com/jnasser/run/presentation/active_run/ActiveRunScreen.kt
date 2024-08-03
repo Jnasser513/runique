@@ -4,7 +4,9 @@ package com.jnasser.run.presentation.active_run
 
 import android.Manifest
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
@@ -32,6 +34,7 @@ import com.jnasser.core.presentation.designsystem.components.RuniqueFloatingActi
 import com.jnasser.core.presentation.designsystem.components.RuniqueOutlinedActionButton
 import com.jnasser.core.presentation.designsystem.components.RuniqueScaffold
 import com.jnasser.core.presentation.designsystem.components.RuniqueToolbar
+import com.jnasser.core.presentation.ui.ObserveAsEvents
 import com.jnasser.run.presentation.R
 import com.jnasser.run.presentation.active_run.components.RunDataCard
 import com.jnasser.run.presentation.active_run.maps.TrackerMap
@@ -41,16 +44,42 @@ import com.jnasser.run.presentation.util.hasNotificationPermission
 import com.jnasser.run.presentation.util.shouldShowLocationPermissionRationale
 import com.jnasser.run.presentation.util.shouldShowNotificationPermissionRationale
 import org.koin.androidx.compose.koinViewModel
+import java.io.ByteArrayOutputStream
 
 @Composable
-fun ActiveRunScreenRot(
+fun ActiveRunScreenRoot(
+    onFinish: () -> Unit,
+    onBack: () -> Unit,
     onServiceToggle: (isServiceRunning: Boolean) -> Unit,
-    viewModel: ActiveRunViewModel = koinViewModel()
+    viewModel: ActiveRunViewModel = koinViewModel(),
 ) {
+    val context = LocalContext.current
+    ObserveAsEvents(flow = viewModel.events) { event ->
+        when(event) {
+            is ActiveRunEvent.Error -> {
+                Toast.makeText(
+                    context,
+                    event.error.asString(context),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            ActiveRunEvent.RunSaved -> onFinish()
+        }
+    }
     ActiveRunScreen(
         state = viewModel.state,
         onServiceToggle = onServiceToggle,
-        onAction = viewModel::onAction
+        onAction = { action ->
+            when(action) {
+                is ActiveRunActions.OnBackClick -> {
+                    if(!viewModel.state.hasStartedRunning) {
+                        onBack()
+                    }
+                }
+                else -> Unit
+            }
+            viewModel.onAction(action)
+        }
     )
 }
 
@@ -64,11 +93,11 @@ private fun ActiveRunScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        val hasCoarseLocationPermission = perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val hasCourseLocationPermission = perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         val hasFineLocationPermission = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val hasNotificationPermission =
-            if (Build.VERSION.SDK_INT >= 33) perms[Manifest.permission.POST_NOTIFICATIONS] == true
-            else true
+        val hasNotificationPermission = if (Build.VERSION.SDK_INT >= 33) {
+            perms[Manifest.permission.POST_NOTIFICATIONS] == true
+        } else true
 
         val activity = context as ComponentActivity
         val showLocationRationale = activity.shouldShowLocationPermissionRationale()
@@ -76,7 +105,7 @@ private fun ActiveRunScreen(
 
         onAction(
             ActiveRunActions.SubmitLocationPermissionInfo(
-                acceptedLocationPermission = hasCoarseLocationPermission && hasFineLocationPermission,
+                acceptedLocationPermission = hasCourseLocationPermission && hasFineLocationPermission,
                 showLocationRationale = showLocationRationale
             )
         )
@@ -112,35 +141,47 @@ private fun ActiveRunScreen(
     }
 
     LaunchedEffect(key1 = state.isRunFinished) {
-        if(state.isRunFinished) {
+        if (state.isRunFinished) {
             onServiceToggle(false)
         }
     }
 
     LaunchedEffect(key1 = state.shouldTrack) {
-        if(context.hasLocationPermission() && state.shouldTrack && !ActiveRunService.isServiceActive) {
+        if (context.hasLocationPermission() && state.shouldTrack && !ActiveRunService.isServiceActive) {
             onServiceToggle(true)
         }
     }
 
-    RuniqueScaffold(withGradient = false, topAppBar = {
-        RuniqueToolbar(
-            showBackButton = true,
-            title = stringResource(id = R.string.active_run),
-            onBackClick = {
-                onAction(ActiveRunActions.OnBackClick)
-            })
-    }, floatingActionButton = {
-        RuniqueFloatingActionButton(
-            icon = if (state.shouldTrack) StopIcon else StartIcon,
-            onClick = {
-                onAction(ActiveRunActions.OnToggleRunClick)
-            },
-            iconSize = 20.dp,
-            contentDescription = if (state.shouldTrack) stringResource(id = R.string.pause_run)
-            else stringResource(id = R.string.start_run)
-        )
-    }) { padding ->
+    RuniqueScaffold(
+        withGradient = false,
+        topAppBar = {
+            RuniqueToolbar(
+                showBackButton = true,
+                title = stringResource(id = R.string.active_run),
+                onBackClick = {
+                    onAction(ActiveRunActions.OnBackClick)
+                },
+            )
+        },
+        floatingActionButton = {
+            RuniqueFloatingActionButton(
+                icon = if (state.shouldTrack) {
+                    StopIcon
+                } else {
+                    StartIcon
+                },
+                onClick = {
+                    onAction(ActiveRunActions.OnToggleRunClick)
+                },
+                iconSize = 20.dp,
+                contentDescription = if (state.shouldTrack) {
+                    stringResource(id = R.string.pause_run)
+                } else {
+                    stringResource(id = R.string.start_run)
+                }
+            )
+        }
+    ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -150,8 +191,19 @@ private fun ActiveRunScreen(
                 isRunFinished = state.isRunFinished,
                 currentLocation = state.currentLocation,
                 locations = state.runDara.locations,
-                onSnapshot = {},
-                modifier = Modifier.fillMaxSize()
+                onSnapshot = { bmp ->
+                    val stream = ByteArrayOutputStream()
+                    stream.use {
+                        bmp.compress(
+                            Bitmap.CompressFormat.JPEG,
+                            80,
+                            it
+                        )
+                    }
+                    onAction(ActiveRunActions.OnRunProcess(stream.toByteArray()))
+                },
+                modifier = Modifier
+                    .fillMaxSize()
             )
             RunDataCard(
                 elapsedTime = state.elapsedTime,
@@ -180,7 +232,8 @@ private fun ActiveRunScreen(
                     },
                     modifier = Modifier.weight(1f)
                 )
-            }, secondaryButton = {
+            },
+            secondaryButton = {
                 RuniqueOutlinedActionButton(
                     text = stringResource(id = R.string.finish),
                     isLoading = state.isSavingRun,
@@ -189,16 +242,26 @@ private fun ActiveRunScreen(
                     },
                     modifier = Modifier.weight(1f)
                 )
-            })
+            }
+        )
     }
 
     if (state.showLocationRationale || state.showNotificationRationale) {
-        RuniqueDialog(title = stringResource(id = R.string.permission_required),
+        RuniqueDialog(
+            title = stringResource(id = R.string.permission_required),
             onDismiss = { /* Normal dismissing not allowed for permissions */ },
             description = when {
-                state.showLocationRationale && state.showNotificationRationale -> stringResource(id = R.string.location_notification_rationale)
-                state.showLocationRationale -> stringResource(id = R.string.location_rationale)
-                else -> stringResource(id = R.string.notification_rationale)
+                state.showLocationRationale && state.showNotificationRationale -> {
+                    stringResource(id = R.string.location_notification_rationale)
+                }
+
+                state.showLocationRationale -> {
+                    stringResource(id = R.string.location_rationale)
+                }
+
+                else -> {
+                    stringResource(id = R.string.notification_rationale)
+                }
             },
             primaryButton = {
                 RuniqueOutlinedActionButton(
@@ -207,26 +270,34 @@ private fun ActiveRunScreen(
                     onClick = {
                         onAction(ActiveRunActions.DismissRationaleDialog)
                         permissionLauncher.requestRuniquePermissions(context)
-                    })
-            })
+                    },
+                )
+            }
+        )
     }
 }
 
-private fun ActivityResultLauncher<Array<String>>.requestRuniquePermissions(context: Context) {
+private fun ActivityResultLauncher<Array<String>>.requestRuniquePermissions(
+    context: Context
+) {
     val hasLocationPermission = context.hasLocationPermission()
     val hasNotificationPermission = context.hasNotificationPermission()
 
-    val locationPermission = arrayOf(
-        Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
+    val locationPermissions = arrayOf(
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_FINE_LOCATION,
     )
     val notificationPermission = if (Build.VERSION.SDK_INT >= 33) {
         arrayOf(Manifest.permission.POST_NOTIFICATIONS)
     } else arrayOf()
 
     when {
-        !hasLocationPermission && !hasNotificationPermission -> launch(locationPermission + notificationPermission)
-        !hasLocationPermission -> launch(locationPermission)
-        else -> launch(notificationPermission)
+        !hasLocationPermission && !hasNotificationPermission -> {
+            launch(locationPermissions + notificationPermission)
+        }
+
+        !hasLocationPermission -> launch(locationPermissions)
+        !hasNotificationPermission -> launch(notificationPermission)
     }
 }
 

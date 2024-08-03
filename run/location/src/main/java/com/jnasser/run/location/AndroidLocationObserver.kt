@@ -30,11 +30,11 @@ class AndroidLocationObserver(
             val locationManager = context.getSystemService<LocationManager>()!!
             var isGpsEnabled = false
             var isNetworkEnabled = false
-            while (!isGpsEnabled && !isNetworkEnabled) {
+            while(!isGpsEnabled && !isNetworkEnabled) {
                 isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
                 isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 
-                if(!isGpsEnabled || !isNetworkEnabled) {
+                if(!isGpsEnabled && !isNetworkEnabled) {
                     delay(3000L)
                 }
             }
@@ -66,6 +66,7 @@ class AndroidLocationObserver(
                         }
                     }
                 }
+
                 client.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
 
                 awaitClose {

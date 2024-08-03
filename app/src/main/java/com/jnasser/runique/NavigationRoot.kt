@@ -12,7 +12,7 @@ import androidx.navigation.navDeepLink
 import com.jnasser.auth.presentation.intro.IntroScreenRoot
 import com.jnasser.auth.presentation.login.LoginScreenRoot
 import com.jnasser.auth.presentation.register.RegisterScreenRoot
-import com.jnasser.run.presentation.active_run.ActiveRunScreenRot
+import com.jnasser.run.presentation.active_run.ActiveRunScreenRoot
 import com.jnasser.run.presentation.active_run.service.ActiveRunService
 import com.jnasser.run.presentation.run_overview.RunOverviewScreenRoot
 import timber.log.Timber
@@ -92,7 +92,14 @@ private fun NavGraphBuilder.runGraph(navController: NavHostController) {
     ) {
         composable("run_overview") {
             RunOverviewScreenRoot(
-                onStartRunClick = { navController.navigate("active_run") }
+                onStartRunClick = { navController.navigate("active_run") },
+                onLogoutClick = {
+                    navController.navigate("auth") {
+                        popUpTo("run") {
+                            inclusive = true
+                        }
+                    }
+                }
             )
         }
         composable(
@@ -104,7 +111,13 @@ private fun NavGraphBuilder.runGraph(navController: NavHostController) {
             )
         ) {
             val context = LocalContext.current
-            ActiveRunScreenRot(
+            ActiveRunScreenRoot(
+                onFinish = {
+                    navController.navigateUp()
+                },
+                onBack = {
+                    navController.navigateUp()
+                },
                 onServiceToggle = { shouldServiceRun ->
                     if (shouldServiceRun) {
                         context.startService(
