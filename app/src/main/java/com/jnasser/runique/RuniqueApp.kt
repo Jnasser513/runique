@@ -1,6 +1,8 @@
 package com.jnasser.runique
 
 import android.app.Application
+import android.content.Context
+import com.google.android.play.core.splitcompat.SplitCompat
 import com.jnasser.auth.data.di.authDataModule
 import com.jnasser.auth.presentation.di.authViewModelModule
 import com.jnasser.core.data.di.coreDataModule
@@ -46,4 +48,8 @@ class RuniqueApp: Application() {
         }
     }
 
+    override fun attachBaseContext(base: Context?) {
+        super.attachBaseContext(base)
+        SplitCompat.install(this)
+    }
 }

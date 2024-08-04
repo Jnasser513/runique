@@ -9,6 +9,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.core.scope.get
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import org.koin.dsl.single
 
 val databaseModule = module {
     single {
