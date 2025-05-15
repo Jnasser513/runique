@@ -1,10 +1,12 @@
 package com.jnasser.core.presentation.designsystem.components
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 
 @Composable
 fun RuniqueScaffold(

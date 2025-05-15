@@ -1,6 +1,7 @@
 package com.jnasser.core.domain.run
 
 import com.jnasser.core.domain.location.Location
+import java.io.Serial
 import java.time.ZonedDateTime
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
